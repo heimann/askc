@@ -182,7 +182,7 @@ def save_script(script: str) -> None:
     console.print(f"[green]Saved to {path}[/green]")
 
 
-async def handle_script_interaction(script: str, is_multiline: bool) -> None:
+async def handle_script_interaction(script: str, is_multiline: bool, query_id: int | None = None) -> None:
     """Handle interactive prompt for script/command."""
     if is_multiline:
         console.print("[dim]  → script ready[/dim]")
@@ -198,6 +198,10 @@ async def handle_script_interaction(script: str, is_multiline: bool) -> None:
 
         if choice == "r":
             run_script(script)
+            # Mark script as run in db
+            if query_id is not None:
+                from askc.db import mark_script_run
+                mark_script_run(query_id)
             break
         elif choice == "p" and is_multiline:
             preview_script(script)
@@ -257,6 +261,7 @@ async def run_interactive(question: str) -> None:
     result: QueryResult | None = None
     cost: float | None = None
     spinner_idx = 0
+    log_events: list[dict] = []  # Capture all events for logging
 
     bash_tool_ids: dict[str, str] = {}  # tool_use_id -> command
 
@@ -280,21 +285,37 @@ async def run_interactive(question: str) -> None:
                         spinner_idx = (spinner_idx + 1) % len(SPINNER_STYLES)
                         tool_name = getattr(block, "name", "tool")
                         tool_input = getattr(block, "input", {})
+                        tool_id = getattr(block, "id", None)
                         status_msg, _ = get_tool_status(tool_name, tool_input)
                         status.update(status_msg, spinner=SPINNER_STYLES[spinner_idx])
 
+                        # Log the tool call
+                        log_events.append({
+                            "type": "tool_use",
+                            "tool": tool_name,
+                            "input": tool_input,
+                            "id": tool_id,
+                        })
+
                         # Track Bash commands for showing output later
                         if tool_name == "Bash":
-                            tool_id = getattr(block, "id", None)
                             if tool_id:
                                 bash_tool_ids[tool_id] = tool_input.get("command", "")
 
                     elif type(block).__name__ == "ToolResultBlock":
-                        # Show Bash output when it completes
                         tool_use_id = getattr(block, "tool_use_id", None)
+                        output = getattr(block, "content", "")
+
+                        # Log the tool result
+                        log_events.append({
+                            "type": "tool_result",
+                            "id": tool_use_id,
+                            "output": output[:1000] if isinstance(output, str) else str(output)[:1000],
+                        })
+
+                        # Show Bash output when it completes
                         if tool_use_id in bash_tool_ids:
                             cmd = bash_tool_ids.pop(tool_use_id)
-                            output = getattr(block, "content", "")
                             if output and isinstance(output, str):
                                 # Show truncated output
                                 lines = output.strip().split("\n")
@@ -323,13 +344,22 @@ async def run_interactive(question: str) -> None:
         if cost is not None:
             console.print(f"[dim]  💰 ${cost:.4f}[/dim]")
             from askc.db import log_query
-            log_query(cost, question)
+            script = result.suggested_script or result.suggested_command or ""
+            query_id = log_query(
+                cost_usd=cost,
+                question=question,
+                answer=result.answer,
+                log_events=log_events,
+                suggested=script,
+            )
+        else:
+            query_id = None
+            script = result.suggested_script or result.suggested_command
 
         # Handle script/command interaction
-        script = result.suggested_script or result.suggested_command
         if script:
             is_script = bool(result.suggested_script)
-            await handle_script_interaction(script, is_script)
+            await handle_script_interaction(script, is_script, query_id)
     else:
         console.print("[red]No response received[/red]")
 
