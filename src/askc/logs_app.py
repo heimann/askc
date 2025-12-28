@@ -2,7 +2,7 @@ import subprocess
 from datetime import datetime
 
 from textual.app import App, ComposeResult
-from textual.containers import Horizontal, Vertical
+from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.widgets import Footer, ListItem, ListView, Static
 from textual.binding import Binding
 
@@ -135,8 +135,7 @@ class LogsApp(App):
     }
 
     QueryDetail {
-        height: 100%;
-        overflow-y: auto;
+        height: auto;
     }
     """
 
@@ -145,6 +144,8 @@ class LogsApp(App):
         Binding("y", "yank", "Yank"),
         Binding("j", "cursor_down", "Down", show=False),
         Binding("k", "cursor_up", "Up", show=False),
+        Binding("d", "scroll_down", "Scroll down", show=False),
+        Binding("u", "scroll_up", "Scroll up", show=False),
     ]
 
     def __init__(self) -> None:
@@ -156,7 +157,7 @@ class LogsApp(App):
         with Horizontal(id="container"):
             with Vertical(id="list-container"):
                 yield ListView(*[QueryListItem(q) for q in self.queries])
-            with Vertical(id="detail-container"):
+            with VerticalScroll(id="detail-container"):
                 yield QueryDetail(id="detail")
         yield Footer()
 
@@ -185,8 +186,20 @@ class LogsApp(App):
     def action_cursor_up(self) -> None:
         self.query_one(ListView).action_cursor_up()
 
+    def action_scroll_down(self) -> None:
+        container = self.query_one("#detail-container", VerticalScroll)
+        container.scroll_relative(y=container.size.height // 2, animate=True)
+
+    def action_scroll_up(self) -> None:
+        container = self.query_one("#detail-container", VerticalScroll)
+        container.scroll_relative(y=-(container.size.height // 2), animate=True)
+
     def action_yank(self) -> None:
         """Copy 'askc logs {id}' to clipboard."""
+        import base64
+        import os
+        import sys
+
         if not self.current_query:
             self.notify("No query selected", severity="warning")
             return
@@ -194,10 +207,14 @@ class LogsApp(App):
         query_id = self.current_query["id"]
         cmd = f"askc logs {query_id}"
 
-        # Try OSC 52 first (works over SSH in terminals like Blink, iTerm2, etc.)
-        import base64
-        import sys
-        osc52 = f"\033]52;c;{base64.b64encode(cmd.encode()).decode()}\a"
+        # OSC 52 clipboard escape sequence
+        b64 = base64.b64encode(cmd.encode()).decode()
+        osc52 = f"\033]52;c;{b64}\a"
+
+        # Wrap for tmux passthrough if inside tmux
+        if os.environ.get("TMUX"):
+            osc52 = f"\033Ptmux;\033{osc52}\033\\"
+
         sys.stdout.write(osc52)
         sys.stdout.flush()
         self.notify(f"Copied: {cmd}")
