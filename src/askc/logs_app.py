@@ -194,16 +194,13 @@ class LogsApp(App):
         query_id = self.current_query["id"]
         cmd = f"askc logs {query_id}"
 
-        # Try clipboard commands in order of preference
-        for clip_cmd in [["wl-copy"], ["xclip", "-selection", "clipboard"], ["xsel", "--clipboard", "--input"]]:
-            try:
-                subprocess.run(clip_cmd, input=cmd.encode(), check=True)
-                self.notify(f"Copied: {cmd}")
-                return
-            except (subprocess.CalledProcessError, FileNotFoundError):
-                continue
-
-        self.notify("No clipboard tool found (need wl-copy, xclip, or xsel)", severity="error")
+        # Try OSC 52 first (works over SSH in terminals like Blink, iTerm2, etc.)
+        import base64
+        import sys
+        osc52 = f"\033]52;c;{base64.b64encode(cmd.encode()).decode()}\a"
+        sys.stdout.write(osc52)
+        sys.stdout.flush()
+        self.notify(f"Copied: {cmd}")
 
 
 def run_logs_app() -> None:
