@@ -319,9 +319,11 @@ async def run_interactive(question: str) -> None:
         console.print(Markdown(result.answer))
         console.print()
 
-        # Show cost
+        # Show cost and log to db
         if cost is not None:
             console.print(f"[dim]  💰 ${cost:.4f}[/dim]")
+            from askc.db import log_query
+            log_query(cost, question)
 
         # Handle script/command interaction
         script = result.suggested_script or result.suggested_command
