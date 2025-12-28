@@ -104,6 +104,31 @@ def get_total_usage(days: int = 30) -> tuple[float, int]:
     return (row[0], row[1])
 
 
+def get_query_by_id(query_id: int) -> dict | None:
+    """Get a single query by ID."""
+    conn = get_connection()
+    row = conn.execute("""
+        SELECT id, timestamp, cost_usd, question, answer, log, suggested, script_run
+        FROM queries
+        WHERE id = ?
+    """, (query_id,)).fetchone()
+    conn.close()
+
+    if not row:
+        return None
+
+    return {
+        "id": row["id"],
+        "timestamp": row["timestamp"],
+        "cost_usd": row["cost_usd"],
+        "question": row["question"],
+        "answer": row["answer"],
+        "log": json.loads(row["log"]) if row["log"] else [],
+        "suggested": row["suggested"],
+        "script_run": bool(row["script_run"]),
+    }
+
+
 def get_recent_queries(limit: int = 5) -> list[dict]:
     """Get recent queries with full details."""
     conn = get_connection()

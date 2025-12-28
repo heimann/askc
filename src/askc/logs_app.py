@@ -1,3 +1,4 @@
+import subprocess
 from datetime import datetime
 
 from textual.app import App, ComposeResult
@@ -39,7 +40,7 @@ class QueryDetail(Static):
         # Header
         dt = datetime.fromisoformat(query["timestamp"])
         lines.append(f"[bold]{query['question']}[/bold]")
-        lines.append(f"[dim]{dt.strftime('%B %d, %Y at %H:%M')} • ${query['cost_usd']:.4f}[/dim]")
+        lines.append(f"[dim]#{query['id']} • {dt.strftime('%B %d, %Y at %H:%M')} • ${query['cost_usd']:.4f}[/dim]")
         lines.append("")
 
         # Tool calls
@@ -141,6 +142,7 @@ class LogsApp(App):
 
     BINDINGS = [
         Binding("q", "quit", "Quit"),
+        Binding("y", "yank", "Yank"),
         Binding("j", "cursor_down", "Down", show=False),
         Binding("k", "cursor_up", "Up", show=False),
     ]
@@ -148,6 +150,7 @@ class LogsApp(App):
     def __init__(self) -> None:
         super().__init__()
         self.queries = get_recent_queries(50)
+        self.current_query: dict | None = None
 
     def compose(self) -> ComposeResult:
         with Horizontal(id="container"):
@@ -160,24 +163,47 @@ class LogsApp(App):
     def on_mount(self) -> None:
         # Select first item
         if self.queries:
-            self.query_one(QueryDetail).update_query(self.queries[0])
+            self.current_query = self.queries[0]
+            self.query_one(QueryDetail).update_query(self.current_query)
             lv = self.query_one(ListView)
             if lv.children:
                 lv.index = 0
 
     def on_list_view_selected(self, event: ListView.Selected) -> None:
         if isinstance(event.item, QueryListItem):
-            self.query_one(QueryDetail).update_query(event.item.query)
+            self.current_query = event.item.query
+            self.query_one(QueryDetail).update_query(self.current_query)
 
     def on_list_view_highlighted(self, event: ListView.Highlighted) -> None:
         if isinstance(event.item, QueryListItem):
-            self.query_one(QueryDetail).update_query(event.item.query)
+            self.current_query = event.item.query
+            self.query_one(QueryDetail).update_query(self.current_query)
 
     def action_cursor_down(self) -> None:
         self.query_one(ListView).action_cursor_down()
 
     def action_cursor_up(self) -> None:
         self.query_one(ListView).action_cursor_up()
+
+    def action_yank(self) -> None:
+        """Copy 'askc logs {id}' to clipboard."""
+        if not self.current_query:
+            self.notify("No query selected", severity="warning")
+            return
+
+        query_id = self.current_query["id"]
+        cmd = f"askc logs {query_id}"
+
+        # Try clipboard commands in order of preference
+        for clip_cmd in [["wl-copy"], ["xclip", "-selection", "clipboard"], ["xsel", "--clipboard", "--input"]]:
+            try:
+                subprocess.run(clip_cmd, input=cmd.encode(), check=True)
+                self.notify(f"Copied: {cmd}")
+                return
+            except (subprocess.CalledProcessError, FileNotFoundError):
+                continue
+
+        self.notify("No clipboard tool found (need wl-copy, xclip, or xsel)", severity="error")
 
 
 def run_logs_app() -> None:
