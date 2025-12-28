@@ -11,6 +11,7 @@ requires-python = ">=3.12"
 dependencies = [
     "claude-agent-sdk>=0.1.18",
     "rich>=14.2.0",
+    "textual>=6.11.0",
     "typer>=0.21.0",
 ]
 
