@@ -9,9 +9,11 @@ askc "your question"              # interactive mode with spinner
 askc -p "your question"           # print mode (pipeable)
 askc                              # opens $EDITOR for question
 askc -b pi "your question"        # use a specific backend
+askc -d "your question"           # debug mode (show raw events)
 askc logs                         # view recent queries
 askc logs 42                      # view specific query by ID
 askc usage                        # show API usage costs
+askc tools                        # check available tools
 ```
 
 ## Backends
@@ -24,7 +26,8 @@ askc usage                        # show API usage costs
 
 Set default backend via environment variable:
 ```bash
-export ASKC_BACKEND=pi
+set -x ASKC_BACKEND pi  # fish
+export ASKC_BACKEND=pi  # bash/zsh
 ```
 
 ## Install
@@ -51,7 +54,14 @@ askc "hello"
 ## Features
 
 - Streaming responses with spinner feedback
-- Tool call display during execution
+- Web search, code search, and file tools
 - Query logging to SQLite with cost tracking
 - Multiple backend support (OpenCode, Pi, Claude Code)
 - Editor mode for longer questions
+- Debug mode to inspect raw events
+
+## Tests
+
+```bash
+bun test
+```
