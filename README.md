@@ -1,34 +1,57 @@
 # askc
 
-Non-interactive Claude Code on the command line for one off tasks.
+Non-interactive AI assistant for quick terminal questions. Supports multiple backends: OpenCode, Pi, and Claude Code.
 
 ## Usage
 
 ```bash
-askc "your question"     # interactive mode
-askc -p "your question"  # print mode (pipeable)
-askc                     # opens $EDITOR for question
+askc "your question"              # interactive mode with spinner
+askc -p "your question"           # print mode (pipeable)
+askc                              # opens $EDITOR for question
+askc -b pi "your question"        # use a specific backend
+askc logs                         # view recent queries
+askc logs 42                      # view specific query by ID
+askc usage                        # show API usage costs
+```
+
+## Backends
+
+| Backend | CLI Flag | Environment |
+|---------|----------|-------------|
+| OpenCode | `-b opencode` (default) | Requires `opencode` in PATH |
+| Pi | `-b pi` | Requires `pi` in PATH |
+| Claude Code | `-b claude` | Requires `claude` in PATH |
+
+Set default backend via environment variable:
+```bash
+export ASKC_BACKEND=pi
 ```
 
 ## Install
 
-Requires Python 3.12+ and [uv](https://docs.astral.sh/uv/).
+Requires [Bun](https://bun.sh).
 
 ```bash
 git clone https://github.com/heimann/askc.git
 cd askc
-uv sync
+bun install
 ```
 
-Set your Anthropic API key:
-
+Run directly:
 ```bash
-export ANTHROPIC_API_KEY="your-key-here"
+bun run src/cli.ts "hello"
 ```
 
-Run with `uv run askc` or install globally:
-
+Or link globally:
 ```bash
-uv tool install -e .
+bun link
 askc "hello"
 ```
+
+## Features
+
+- Streaming responses with spinner feedback
+- Tool call display during execution
+- Query logging to SQLite with cost tracking
+- Multiple backend support (OpenCode, Pi, Claude Code)
+- Editor mode for longer questions

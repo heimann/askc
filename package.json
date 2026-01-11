@@ -1,0 +1,26 @@
+{
+  "name": "askc",
+  "version": "0.2.0",
+  "description": "Non-interactive AI assistant for quick terminal questions",
+  "type": "module",
+  "bin": {
+    "askc": "./src/cli.ts"
+  },
+  "scripts": {
+    "dev": "bun run src/cli.ts",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@opencode-ai/sdk": "^1.0.0",
+    "chalk": "^5.4.0",
+    "commander": "^13.0.0",
+    "ora": "^8.0.0"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  }
+}
